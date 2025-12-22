@@ -1,14 +1,8 @@
 This script detects introgressed genomic blocks in individual genomes using per-site parental allele information and provides SNP-level outputs suitable for chromosome painting and downstream visualization.
 
-It is designed for population genomic datasets where:
+It is designed for population genomic datasets where, two parental populations are represented by fixed alleles (p1, p2), individuals have phased or unphased genotypes (0|0, 0|1, 1|1, .|.), introgression is inferred from the presence of the foreign parental allele relative to each individual’s background ancestry.
 
-two parental populations are represented by fixed alleles (p1, p2),
-
-individuals have phased or unphased genotypes (0|0, 0|1, 1|1, .|.),
-
-introgression is inferred from the presence of the foreign parental allele relative to each individual’s background ancestry.
-
-In addition to block detection, the script can optionally mask SNP genotypes outside introgressed blocks, allowing clean SNP-level visualization while keeping a consistent set of genomic positions across individuals.
+In addition to block detection, the script can optionally mask SNP genotypes outside introgressed blocks, allowing clean SNP-level visualization (as to continue the plotting with analysis_of_introgression_with_snp_data/src/plot_fixed_site_gts.rb) while keeping a consistent set of genomic positions across individuals.
 
 Features
 
