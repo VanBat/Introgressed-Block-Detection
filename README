@@ -1,0 +1,170 @@
+This script detects introgressed genomic blocks in individual genomes using per-site parental allele information and provides SNP-level outputs suitable for chromosome painting and downstream visualization.
+
+It is designed for population genomic datasets where:
+
+two parental populations are represented by fixed alleles (p1, p2),
+
+individuals have phased or unphased genotypes (0|0, 0|1, 1|1, .|.),
+
+introgression is inferred from the presence of the foreign parental allele relative to each individual’s background ancestry.
+
+In addition to block detection, the script can optionally mask SNP genotypes outside introgressed blocks, allowing clean SNP-level visualization while keeping a consistent set of genomic positions across individuals.
+
+Features
+
+Detect introgressed blocks per individual using a sliding-window approach
+
+Flexible definition of introgression:
+
+foreign homozygotes only, or
+
+foreign allele present in heterozygotes
+
+Filters blocks by:
+
+minimum SNP count
+
+missing genotype proportion
+
+proportion of non-introgressed SNPs
+
+Outputs per-individual block files
+
+Creates a filtered SNP table containing only positions inside any introgressed block across all individuals
+
+Optional SNP-level masking:
+
+for each individual, genotypes outside that individual’s blocks are replaced by the expected background homozygote
+
+number and coordinates of SNPs remain unchanged
+
+Designed for chromosome painting and comparative visualization across individuals
+
+Input Requirements
+1. SNP table (TSV)
+
+Must contain at least these columns:
+
+Column	Description
+Chromosome	Scaffold / chromosome name
+Position	Genomic position (bp)
+p1	Parental allele (0/1)
+p2	Parental allele (0/1)
+<individual IDs>	Genotypes (`0
+
+Example:
+
+Chromosome  Position  p1  p2  10007  10008
+sc01        3790697   0   1   0|1    0|0
+
+2. Background map
+
+Defines the background ancestry of each individual.
+
+Whitespace-separated file with two columns:
+
+10007  p1
+10008  p2
+
+
+p1 means background allele is taken from column p1
+
+p2 means background allele is taken from column p2
+
+How Introgression Is Defined
+
+For each individual and SNP:
+
+the foreign allele is the parental allele not matching the individual’s background
+
+a SNP is introgressed if:
+
+it is homozygous for the foreign allele, or
+
+(optionally) heterozygous and contains the foreign allele
+
+Blocks are built by:
+
+scanning with a sliding SNP window
+
+extending while introgressed SNPs remain close in genomic distance
+
+stopping after two consecutive non-introgressed SNPs (configurable for missing data)
+
+Usage
+Basic run (block detection + filtered SNP table)
+python van_block_filters.py \
+  -c input_snps.tsv \
+  -i 10007,10008,10009 \
+  --background_map background_map.tsv \
+  -w 3 \
+  --max_distance 3000 \
+  --min_snps 5 \
+  --max_missing_prop 0.2 \
+  --max_nonintro_prop 0.5 \
+  --count_hetero_as_introgressed \
+--filtered_snps_out filtered_snps_masked.tsv \
+  --mask_outside_blocks
+
+                                                    
+This will:
+
+keep exactly the same SNP positions as the unmasked filtered file
+
+overwrite each individual’s genotypes outside their introgressed blocks with the expected background homozygote
+
+Optional:
+
+--mask_missing_too
+
+
+also masks missing genotypes (.|.) outside blocks.
+Outputs
+1. Per-individual block files
+
+For each individual:
+
+blocks_<INDIVIDUAL>_w<WINDOW>.tsv
+
+
+Columns include:
+
+Chromosome
+
+Individual
+
+Start, End
+
+Lenght (bp)
+
+counts of genotype classes
+
+N_SNPs
+
+Non_introgressed
+
+2. Filtered SNP table
+
+Contains only SNPs that fall inside any introgressed block across all individuals.
+
+Same Chromosome/Position set for all individuals
+
+Suitable for chromosome painting and comparative plots
+
+If masking is enabled:
+
+genotypes outside blocks are altered
+
+row count and coordinates remain unchanged
+
+Important Notes
+
+Masking does not remove SNPs, it only changes genotype values
+
+Differences in retained SNP percentages are almost always due to:
+
+missing --count_hetero_as_introgressed
+
+changes in block-filtering parameters
+
+If you change block-definition parameters, recompute blocks before masking
