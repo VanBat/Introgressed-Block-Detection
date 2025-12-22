@@ -8,11 +8,7 @@ Features
 
 Detect introgressed blocks per individual using a sliding-window approach
 
-Flexible definition of introgression:
-
-foreign homozygotes only, or
-
-foreign allele present in heterozygotes
+Flexible definition of introgression: foreign homozygotes only, or foreign allele present in heterozygotes.
 
 Filters blocks by:
 
@@ -26,16 +22,12 @@ Outputs per-individual block files
 
 Creates a filtered SNP table containing only positions inside any introgressed block across all individuals
 
-Optional SNP-level masking:
-
-for each individual, genotypes outside that individual’s blocks are replaced by the expected background homozygote
-
-number and coordinates of SNPs remain unchanged
+Optional SNP-level masking: for each individual, genotypes outside that individual’s blocks are replaced by the expected background homozygote number and coordinates of SNPs remain unchanged.
 
 Designed for chromosome painting and comparative visualization across individuals
 
 Input Requirements
-1. SNP table (TSV)
+1. SNP table (TSV) (can be generated from VCF file with: https://github.com/mmatschiner/tutorials/blob/master/analysis_of_introgression_with_snp_data/src/get_fixed_site_gts.rb)
 
 Must contain at least these columns:
 
@@ -67,27 +59,19 @@ p2 means background allele is taken from column p2
 
 How Introgression Is Defined
 
-For each individual and SNP:
-
-the foreign allele is the parental allele not matching the individual’s background
+For each individual and SNP, the foreign allele is the parental allele not matching the individual’s background.
 
 a SNP is introgressed if:
 
-it is homozygous for the foreign allele, or
-
-(optionally) heterozygous and contains the foreign allele
+it is homozygous for the foreign allele, or (optionally) heterozygous and contains the foreign allele.
 
 Blocks are built by:
 
-scanning with a sliding SNP window
-
-extending while introgressed SNPs remain close in genomic distance
-
-stopping after two consecutive non-introgressed SNPs (configurable for missing data)
+scanning with a sliding SNP window, extending while introgressed SNPs remain close in genomic distance and stopping after two consecutive non-introgressed SNPs (configurable for missing data). Window size w sets the tolerance for noise by allowing up to (w − 1) non-introgressed or missing SNPs between introgressed SNPs during block seeding; smaller w enforces stricter clustering, larger w allows sparser introgressed signal.
 
 Usage
-Basic run (block detection + filtered SNP table)
-python van_block_filters.py \
+
+python block_filters.py \
   -c input_snps.tsv \
   -i 10007,10008,10009 \
   --background_map background_map.tsv \
@@ -101,11 +85,7 @@ python van_block_filters.py \
   --mask_outside_blocks
 
                                                     
-This will:
-
-keep exactly the same SNP positions as the unmasked filtered file
-
-overwrite each individual’s genotypes outside their introgressed blocks with the expected background homozygote
+This will overwrite each individual’s genotypes outside their introgressed blocks in the input fixed sites file with the expected background homozygote
 
 Optional:
 
@@ -113,6 +93,8 @@ Optional:
 
 
 also masks missing genotypes (.|.) outside blocks.
+
+
 Outputs
 1. Per-individual block files
 
@@ -143,22 +125,7 @@ Contains only SNPs that fall inside any introgressed block across all individual
 
 Same Chromosome/Position set for all individuals
 
-Suitable for chromosome painting and comparative plots
 
-If masking is enabled:
+If masking is enabled, genotypes outside blocks are altered, row count and coordinates remain unchanged.
 
-genotypes outside blocks are altered
 
-row count and coordinates remain unchanged
-
-Important Notes
-
-Masking does not remove SNPs, it only changes genotype values
-
-Differences in retained SNP percentages are almost always due to:
-
-missing --count_hetero_as_introgressed
-
-changes in block-filtering parameters
-
-If you change block-definition parameters, recompute blocks before masking
