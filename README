@@ -1,131 +1,148 @@
-This script detects introgressed genomic blocks in individual genomes using per-site parental allele information and provides SNP-level outputs suitable for chromosome painting and downstream visualization.
+### Description  ###
+Detects introgressed genomic blocks in individual genomes using per-site 
+parental allele information (p1/p2) and produces SNP-level outputs suitable 
+for chromosome painting and downstream visualization.
 
-It is designed for population genomic datasets where, two parental populations are represented by fixed alleles (p1, p2), individuals have phased or unphased genotypes (0|0, 0|1, 1|1, .|.), introgression is inferred from the presence of the foreign parental allele relative to each individual’s background ancestry.
+For each individual, the script:
+1. Scans the SNP table for foreign alleles relative to the individual's 
+   background ancestry
+2. Builds introgressed blocks using a sliding window approach
+3. Optionally masks genotypes outside detected blocks with the expected 
+   background homozygote (for clean visualization)
 
-In addition to block detection, the script can optionally mask SNP genotypes outside introgressed blocks, allowing clean SNP-level visualization (as to continue the plotting with analysis_of_introgression_with_snp_data/src/plot_fixed_site_gts.rb) while keeping a consistent set of genomic positions across individuals.
 
-Features
 
-Detect introgressed blocks per individual using a sliding-window approach
+###  Input  ###
 
-Flexible definition of introgression: foreign homozygotes only, or foreign allele present in heterozygotes.
+####  1. SNP table (TSV)  ####
+Tab-separated file with at minimum these columns:
 
-Filters blocks by:
-
-minimum SNP count
-
-missing genotype proportion
-
-proportion of non-introgressed SNPs
-
-Outputs per-individual block files
-
-Creates a filtered SNP table containing only positions inside any introgressed block across all individuals
-
-Optional SNP-level masking: for each individual, genotypes outside that individual’s blocks are replaced by the expected background homozygote number and coordinates of SNPs remain unchanged.
-
-Designed for chromosome painting and comparative visualization across individuals
-
-Input Requirements
-1. SNP table (TSV) (can be generated from VCF file with: https://github.com/mmatschiner/tutorials/blob/master/analysis_of_introgression_with_snp_data/src/get_fixed_site_gts.rb)
-
-Must contain at least these columns:
-
-Column	Description
-Chromosome	Scaffold / chromosome name
-Position	Genomic position (bp)
-p1	Parental allele (0/1)
-p2	Parental allele (0/1)
-<individual IDs>	Genotypes (`0
+| Column        | Description                        |
+|---------------|------------------------------------|
+| Chromosome    | Scaffold / chromosome name         |
+| Position      | Genomic position (bp)              |
+| p1            | Parental allele (0 or 1)           |
+| p2            | Parental allele (0 or 1)           |
+| [individual]  | Phased genotype (0|0, 0|1, 1|1, .|.) |
 
 Example:
-
 Chromosome  Position  p1  p2  10007  10008
 sc01        3790697   0   1   0|1    0|0
 
-2. Background map
+Can be generated from a VCF using get_fixed_site_gts.rb (https://github.com/mmatschiner/tutorials).
 
-Defines the background ancestry of each individual.
-
-Whitespace-separated file with two columns:
+####  2. Background map (TSV/whitespace)  ####
+Two-column file defining background ancestry per individual:
 
 10007  p1
 10008  p2
+.........
+
+- `p1` = individual's background allele comes from parental population p1
+- `p2` = individual's background allele comes from parental population p2
 
 
-p1 means background allele is taken from column p1
 
-p2 means background allele is taken from column p2
+###  How introgression is defined  ###
+For each individual and SNP, the **foreign allele** is the parental allele 
+not matching the individual's background ancestry.
 
-How Introgression Is Defined
+A SNP is considered **introgressed** if:
+- it is homozygous for the foreign allele, OR
+- (optionally) heterozygous and contains the foreign allele 
+  (`--count_hetero_as_introgressed`)
 
-For each individual and SNP, the foreign allele is the parental allele not matching the individual’s background.
+**Blocks** are built by scanning forward from each introgressed SNP and 
+extending while:
+- consecutive introgressed SNPs remain within `--max_distance` bp
+- the number of consecutive non-introgressed SNPs does not exceed 
+  `--max_consecutive_nonintro`
 
-a SNP is introgressed if:
+Blocks are filtered by minimum SNP count, missing genotype proportion, 
+and non-introgressed SNP proportion.
 
-it is homozygous for the foreign allele, or (optionally) heterozygous and contains the foreign allele.
 
-Blocks are built by:
+## Usage
 
-scanning with a sliding SNP window, extending while introgressed SNPs remain close in genomic distance and stopping after two consecutive non-introgressed SNPs (configurable for missing data). Window size w sets the tolerance for noise by allowing up to (w − 1) non-introgressed or missing SNPs between introgressed SNPs during block seeding; smaller w enforces stricter clustering, larger w allows sparser introgressed signal.
 
-Usage
-
-python block_filters.py \
+python Introgressed_block_filters.py \
   -c input_snps.tsv \
   -i 10007,10008,10009 \
   --background_map background_map.tsv \
-  -w 3 \
   --max_distance 3000 \
   --min_snps 5 \
-  --max_missing_prop 0.2 \
-  --max_nonintro_prop 0.5 \
+  --max_consecutive_nonintro 1 \
+  --max_missing_prop 0.1 \
+  --max_nonintro_prop 0.1 \
   --count_hetero_as_introgressed \
---filtered_snps_out filtered_snps_masked.tsv \
-  --mask_outside_blocks
-
-                                                    
-This will overwrite each individual’s genotypes outside their introgressed blocks in the input fixed sites file with the expected background homozygote
-
-Optional:
-
---mask_missing_too
+  --masked_snps_out masked_output.tsv
 
 
-also masks missing genotypes (.|.) outside blocks.
 
+###  Arguments  ###
 
-Outputs
-1. Per-individual block files
+#### Required  ####
+| Argument | Description |
+|---|---|
+| `-c`, `--input_file_name` | Input SNP table (TSV) |
+| `-i`, `--individuals` | Comma-separated list of individual IDs |
+| `--background_map` | Background ancestry map file |
+| `--masked_snps_out` | Output TSV: full SNP table with masking applied |
 
-For each individual:
+### Block detection parameters
+| Argument | Default | Description |
+|---|---|---|
+| `--max_distance` | 50000 | Maximum bp distance between consecutive introgressed SNPs within a block |
+| `--min_snps` | 3 | Minimum number of SNPs in a block to retain it |
+| `--max_missing_prop` | 0.5 | Maximum proportion of missing genotypes allowed in a block |
+| `--max_nonintro_prop` | 0.5 | Maximum proportion of non-introgressed SNPs allowed in a block |
+| `--max_consecutive_nonintro` | 1 | Maximum number of consecutive non-introgressed SNPs allowed while extending a block |
 
-blocks_<INDIVIDUAL>_w<WINDOW>.tsv
+### Flags
+| Flag | Description |
+|---|---|
+| `--count_hetero_as_introgressed` | Count heterozygotes containing the foreign allele as introgressed (default: only homozygous foreign counts) |
+| `--missing_breaks_streak` | If set, missing genotypes count toward the consecutive non-introgressed streak (default: missing is tolerated) |
+| `--reuse_existing_blocks` | If set, reuse existing blocks_[ID]_w1.tsv files instead of recomputing |
 
+---
 
-Columns include:
+## Outputs
 
-Chromosome
+### 1. Per-individual block files
+One file per individual:
 
-Individual
+blocks_[INDIVIDUAL]_w1.tsv
 
-Start, End
+Columns:
+| Column | Description |
+|---|---|
+| Chromosome | Scaffold/chromosome |
+| Individual | Individual ID |
+| Start | Block start position (bp) |
+| End | Block end position (bp) |
+| Lenght | Block length (bp) |
+| Homo_00_count | Count of 0\|0 genotypes in block |
+| Homo_11_count | Count of 1\|1 genotypes in block |
+| Heterozygote | Count of heterozygous genotypes in block |
+| Missing | Count of missing genotypes in block |
+| N_SNPs | Total SNPs in block |
+| Non_introgressed | Count of non-introgressed SNPs in block |
 
-Lenght (bp)
+### 2. Masked SNP table (`--masked_snps_out`)
+Full SNP table (same rows as input) where, for each individual, genotypes 
+**outside** detected introgressed blocks are replaced by the expected 
+background homozygote (0|0 or 1|1). Missing genotypes (.|.) are **never** 
+overwritten. This masked genotypes can be visualized using script: plot_fixed_site_gts.rb (https://github.com/mmatschiner/tutorials)
 
-counts of genotype classes
+---
 
-N_SNPs
+## Dependencies
+- Python 3
+- pandas
+- numpy
 
-Non_introgressed
+---
 
-2. Filtered SNP table
-
-Contains only SNPs that fall inside any introgressed block across all individuals.
-
-Same Chromosome/Position set for all individuals
-
-
-If masking is enabled, genotypes outside blocks are altered, row count and coordinates remain unchanged.
 
 
